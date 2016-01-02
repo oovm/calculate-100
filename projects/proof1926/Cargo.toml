@@ -1,6 +1,5 @@
 [package]
-name = "sub_projects"
-publish = false
+name = "proof1926"
 version = "0.0.0"
 authors = ["Aster <192607617@qq.com>"]
 description = "..."
@@ -11,6 +10,8 @@ license = "MPL-2.0"
 edition = "2021"
 
 [dependencies]
+itertools = "0.10.5"
+dashu = "0.3.1"
 
 [dev-dependencies]
 
