@@ -1,7 +1,7 @@
 [workspace]
 members = ["projects/*"]
 default-members = [
-    "projects/proof1926",
+    "projects/proof-core",
 ]
 exclude = [
     "projects/.DS_Store",
