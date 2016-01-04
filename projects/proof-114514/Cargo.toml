@@ -1,11 +1,11 @@
 [package]
-name = "mix56"
+name = "proof-114514"
 publish = false
 version = "0.0.0"
 authors = ["Aster <192607617@qq.com>"]
 description = "..."
 repository = "https://github.com/oovm/sub_projects"
-documentation = "https://docs.rs/sub_projects"
+documentation = "https://docs.rs/proof-114514"
 readme = "Readme.md"
 license = "MPL-2.0"
 edition = "2021"
@@ -13,7 +13,6 @@ edition = "2021"
 [dependencies]
 itertools = "0.12.0"
 dashu = "0.4.0"
-num-traits = "0.2.15"
 
 [dev-dependencies]
 
