@@ -1,5 +1,6 @@
 use std::fmt::{Debug};
 use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 use std::str::FromStr;
 use dashu::base::ParseError;
 use dashu::rational::RBig;
@@ -7,13 +8,16 @@ use dashu::rational::RBig;
 mod display;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Operator {
+pub enum Expression {
     /// 坏点, 中止计算
     Negative,
     /// 连接两个数字, 等价于 $10x + y$
     Concat,
     /// 两个数字相加
-    Plus,
+    Plus {
+        lhs: Rc<Expression>,
+        rhs: Rc<Expression>
+    },
     /// 两个数字相减
     Minus {
         reverse: bool
@@ -45,6 +49,12 @@ impl FromStr for Calculate {
 
 impl Calculate {
     pub fn joins(&self) -> Vec<Calculate> {
+        Expression::Plus {
+            lhs: Rc::new(Expression::Negative),
+            rhs: Rc::new(Expression::Negative),
+        };
+
+
         todo!()
     }
 }

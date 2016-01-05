@@ -1,5 +1,8 @@
 (* ::Package:: *)
 
+SetDirectory@NotebookDirectory[];
+
+
 LeftTeeArrow[x_,y_]:=x-y;
 RightTeeArrow[x_,y_]:=-x+y;
 AngleBracket[t_Integer,u_Integer]:=10 ^IntegerLength[u]t+u;
@@ -20,9 +23,9 @@ enumerate[digits_]:=Module[
 	]
 ];
 filterIntegers[expr_]:=Block[
-	{value = Activate@expr},
-	If[!IntegerQ@value,Nothing];
-	{value,expr}
+	{value = Quiet@Check[Activate@expr,Infinity]},
+	If[!IntegerQ@value,Return@Nothing];
+	If[value<0,{-value,Inactive[Minus][expr]},{value,expr}]
 ]
 filterJoin[expr_]:=Block[
 	{count},
@@ -40,4 +43,7 @@ digits={1,1,4,5,1,4};
 ops=Flatten@{Inactive/@{Plus,LeftTeeArrow,RightTeeArrow,Times,Divide},AngleBracket};
 patterns =Evaluate[First[enumerate[digits]]]&@@@Tuples[ops,Length@digits-1];
 patterns =DeleteDuplicates[filterJoin/@patterns];
-answers =findSimplest/@SortBy[GroupBy[Quiet[filterIntegers/@patterns],First],First]
+answers = findSimplest/@SortBy[GroupBy[filterIntegers/@patterns,First],First]
+
+
+Export["cache.raw.json",answers,"ExpressionJSON"];
