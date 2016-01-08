@@ -9,23 +9,38 @@ mod display;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Expression {
+    Atomic {
+        number: RBig
+    },
     /// 坏点, 中止计算
-    Negative,
+    Negative {
+        lhs: Rc<Expression>,
+        rhs: Rc<Expression>,
+    },
     /// 连接两个数字, 等价于 $10x + y$
-    Concat,
+    Concat {
+        lhs: Rc<Expression>,
+        rhs: Rc<Expression>,
+    },
     /// 两个数字相加
     Plus {
         lhs: Rc<Expression>,
-        rhs: Rc<Expression>
+        rhs: Rc<Expression>,
     },
     /// 两个数字相减
     Minus {
         reverse: bool
     },
     /// 两个数字相乘
-    Multiplication,
+    Times {
+        lhs: Rc<Expression>,
+        rhs: Rc<Expression>,
+    },
     /// 两个数字相除
-    Division,
+    Division {
+        lhs: Rc<Expression>,
+        rhs: Rc<Expression>,
+    },
 }
 
 #[derive(Debug)]
@@ -80,6 +95,7 @@ fn generate_combinations_helper(
         current_combination.pop();
     }
 }
+
 #[test]
 fn main() {
     let numbers = vec![1, 2, 3, 4];
@@ -89,6 +105,7 @@ fn main() {
         println!("{:?}", combination);
     }
 }
+
 #[test]
 fn parse_int() {
     let digits = Calculate::from_str("1 1 4 5 1 4".trim()).unwrap();

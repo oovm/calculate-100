@@ -1,4 +1,8 @@
+use std::rc::Rc;
+use dashu::integer::IBig;
+use dashu::rational::RBig;
 use serde_json::Value;
+use crate::node::Expression;
 
 #[test]
 fn cache_json() {
@@ -20,19 +24,43 @@ fn read_pair(pair: &[Value]) -> Option<()> {
     Some(())
 }
 
-fn read_expression(pair: &Value) -> Option<()> {
+fn read_expression(pair: &Value) -> Option<Expression> {
     match pair {
-        Value::Null => {}
-        Value::Bool(_) => {}
+        Value::Null => { None }
+        Value::Bool(_) => { None }
         Value::Number(n) => {
-            println!("N: {:?}", n);
+            Some(Expression::Atomic {
+                number: RBig::from(n.as_i64()?),
+            })
         }
-        Value::String(_) => {}
+        Value::String(_) => { None }
         Value::Array(e) => {
-            let e = e.get(0)?.get(1)?.as_str()?;
-            println!("E: {:?}", e);
+            let o = e.get(0)?.get(1)?.as_str()?;
+            match o {
+                "Plus" => {
+                    let lhs = read_expression(e.get(1)?)?;
+                    let rhs = read_expression(e.get(2)?)?;
+                    Some(Expression::Plus {
+                        lhs: Rc::new(lhs),
+                        rhs: Rc::new(rhs),
+                    })
+                }
+                "Times" => {
+                    let lhs = read_expression(e.get(1)?)?;
+                    let rhs = read_expression(e.get(2)?)?;
+                    Some(Expression::Times {
+                        lhs: Rc::new(lhs),
+                        rhs: Rc::new(rhs),
+                    })
+                }
+                // "Divide" => {}
+                _ => {
+                    println!("O: {:?}", o);
+                    println!("E: {:?}", e);
+                    None
+                }
+            }
         }
-        Value::Object(_) => {}
+        Value::Object(_) => { None }
     }
-    Some(())
 }
