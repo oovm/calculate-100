@@ -1,21 +1,22 @@
-use std::fmt::{Debug};
-use std::hash::{Hash, Hasher};
+use std::fmt::{Debug, Display, Formatter};
 use std::rc::Rc;
 use std::str::FromStr;
 use dashu::base::ParseError;
+use dashu::integer::IBig;
 use dashu::rational::RBig;
 
 mod display;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+
+
+#[derive(Clone, Eq, PartialEq)]
 pub enum Expression {
     Atomic {
-        number: RBig
+        number: IBig
     },
     /// 坏点, 中止计算
     Negative {
         lhs: Rc<Expression>,
-        rhs: Rc<Expression>,
     },
     /// 连接两个数字, 等价于 $10x + y$
     Concat {
@@ -29,7 +30,9 @@ pub enum Expression {
     },
     /// 两个数字相减
     Minus {
-        reverse: bool
+        reverse: bool,
+        lhs: Rc<Expression>,
+        rhs: Rc<Expression>,
     },
     /// 两个数字相乘
     Times {
@@ -37,16 +40,28 @@ pub enum Expression {
         rhs: Rc<Expression>,
     },
     /// 两个数字相除
-    Division {
+    Divide {
         lhs: Rc<Expression>,
         rhs: Rc<Expression>,
     },
 }
 
+
+
 #[derive(Debug)]
 pub struct Calculate {
     digits: Vec<RBig>,
 }
+
+
+
+pub struct Record {
+    pub(crate) e: Expression,
+    pub(crate) n: RBig,
+}
+
+
+
 
 impl FromStr for Calculate {
     type Err = ParseError;
@@ -60,54 +75,4 @@ impl FromStr for Calculate {
             digits,
         })
     }
-}
-
-impl Calculate {
-    pub fn joins(&self) -> Vec<Calculate> {
-        Expression::Plus {
-            lhs: Rc::new(Expression::Negative),
-            rhs: Rc::new(Expression::Negative),
-        };
-
-
-        todo!()
-    }
-}
-
-fn generate_combinations(numbers: &[u32]) -> Vec<Vec<u32>> {
-    let mut result = Vec::new();
-    let mut current_combination = Vec::new();
-    generate_combinations_helper(numbers, &mut result, &mut current_combination, 0);
-    result
-}
-
-fn generate_combinations_helper(
-    numbers: &[u32],
-    result: &mut Vec<Vec<u32>>,
-    current_combination: &mut Vec<u32>,
-    start_index: usize,
-) {
-    result.push(current_combination.clone());
-
-    for i in start_index..numbers.len() {
-        current_combination.push(numbers[i]);
-        generate_combinations_helper(numbers, result, current_combination, i + 1);
-        current_combination.pop();
-    }
-}
-
-#[test]
-fn main() {
-    let numbers = vec![1, 2, 3, 4];
-    let combinations = generate_combinations(&numbers);
-
-    for combination in combinations {
-        println!("{:?}", combination);
-    }
-}
-
-#[test]
-fn parse_int() {
-    let digits = Calculate::from_str("1 1 4 5 1 4".trim()).unwrap();
-    // println!("{:?}", find_combinations(&[1, 2, 3, 4]))
 }
