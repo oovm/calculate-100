@@ -1,18 +1,16 @@
-use std::fmt::{Debug, Display, Formatter};
-use std::rc::Rc;
-use std::str::FromStr;
-use dashu::base::ParseError;
-use dashu::integer::IBig;
-use dashu::rational::RBig;
+use dashu::{base::ParseError, integer::IBig, rational::RBig};
+use std::{
+    fmt::{Debug, Display, Formatter},
+    rc::Rc,
+    str::FromStr,
+};
 
 mod display;
-
-
 
 #[derive(Clone, Eq, PartialEq)]
 pub enum Expression {
     Atomic {
-        number: IBig
+        number: IBig,
     },
     /// 坏点, 中止计算
     Negative {
@@ -30,7 +28,6 @@ pub enum Expression {
     },
     /// 两个数字相减
     Minus {
-        reverse: bool,
         lhs: Rc<Expression>,
         rhs: Rc<Expression>,
     },
@@ -46,22 +43,15 @@ pub enum Expression {
     },
 }
 
-
-
 #[derive(Debug)]
 pub struct Calculate {
     digits: Vec<RBig>,
 }
 
-
-
 pub struct Record {
     pub(crate) e: Expression,
     pub(crate) n: RBig,
 }
-
-
-
 
 impl FromStr for Calculate {
     type Err = ParseError;
@@ -71,8 +61,6 @@ impl FromStr for Calculate {
         for digit in s.split(&[',', '，', ' ']) {
             digits.push(RBig::from_str(digit.trim())?)
         }
-        Ok(Self {
-            digits,
-        })
+        Ok(Self { digits })
     }
 }

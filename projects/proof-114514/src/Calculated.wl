@@ -52,11 +52,17 @@ answers = findSimplest/@SortBy[GroupBy[filterIntegers/@patterns,First],First]
 Export["cache.raw.json",answers,"ExpressionJSON"];
 
 
--x+y//FullForm
+digits={1,1,4!,5,1,4};
+ops={Inactive@Plus,Inactive@Subtract,LeftTeeArrow,Inactive@Times,Inactive@Divide};
+patterns =Evaluate[First[enumerate[digits]]]&@@@Tuples[ops,Length@digits-1];
+patterns =DeleteDuplicates[filterJoin/@patterns];
+answers = findSimplest/@SortBy[GroupBy[filterIntegers/@patterns,First],First];
+answers/.{24->Inactive[Factorial][4]}
 
 
-(* ::Input:: *)
-(**)
-
-
-Inactive[Plus][1,1]
+digits={1,1,4!,5,1,4!};
+ops={Inactive@Plus,Inactive@Subtract,LeftTeeArrow,Inactive@Times,Inactive@Divide};
+patterns =Evaluate[First[enumerate[digits]]]&@@@Tuples[ops,Length@digits-1];
+patterns =DeleteDuplicates[filterJoin/@patterns];
+answers = findSimplest/@SortBy[GroupBy[filterIntegers/@patterns,First],First];
+answers/.{24->Inactive[Factorial][4]}

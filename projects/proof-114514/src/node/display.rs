@@ -23,6 +23,12 @@ impl Debug for Record {
     }
 }
 
+impl Display for Record {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} == {}", self.n, self.e)
+    }
+}
+
 impl Debug for Expression {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -30,9 +36,7 @@ impl Debug for Expression {
             Self::Negative { base: lhs } => f.debug_struct("Negative").field("lhs", lhs).finish(),
             Self::Concat { lhs, rhs } => f.debug_struct("Concat").field("lhs", lhs).field("rhs", rhs).finish(),
             Self::Plus { lhs, rhs } => f.debug_struct("Plus").field("lhs", lhs).field("rhs", rhs).finish(),
-            Self::Minus { reverse, lhs, rhs } => {
-                f.debug_struct("Minus").field("reverse", reverse).field("lhs", lhs).field("rhs", rhs).finish()
-            }
+            Self::Minus { lhs, rhs } => f.debug_struct("Minus").field("lhs", lhs).field("rhs", rhs).finish(),
             Self::Times { lhs, rhs } => f.debug_struct("Times").field("lhs", lhs).field("rhs", rhs).finish(),
             Self::Divide { lhs, rhs } => f.debug_struct("Divide").field("lhs", lhs).field("rhs", rhs).finish(),
         }
@@ -53,12 +57,12 @@ impl Display for Expression {
             }
             Self::Concat { lhs, rhs } => write!(f, "{lhs}{rhs}")?,
             Self::Plus { lhs, rhs } => write!(f, "{lhs}+{rhs}")?,
-            Self::Minus { reverse, lhs, rhs } => {
-                if *reverse {
-                    if lhs.lower_than_atom() { write!(f, "-{lhs}+{rhs}")? } else { write!(f, "(-{lhs})+{rhs}")? }
+            Self::Minus { lhs, rhs } => {
+                if rhs.lower_than_mul() {
+                    write!(f, "{lhs}-({rhs})")?
                 }
                 else {
-                    if rhs.lower_than_mul() { write!(f, "{lhs}-({rhs})")? } else { write!(f, "{lhs}-{rhs}")? }
+                    write!(f, "{lhs}-{rhs}")?
                 }
             }
             Self::Times { lhs, rhs } => {
@@ -79,7 +83,10 @@ impl Display for Expression {
                     write!(f, "{lhs}")?
                 }
                 f.write_char('÷')?;
-                if rhs.lower_than_mul() { write!(f, "({rhs})")? } else { write!(f, "{rhs}")? }
+                match &**rhs {
+                    Self::Atomic { .. } => write!(f, "{rhs}")?,
+                    _ => write!(f, "({rhs})")?,
+                }
             }
         }
         Ok(())
@@ -93,12 +100,7 @@ impl Expression {
             _ => false,
         }
     }
-    fn lower_sub_rev(&self) -> bool {
-        match self {
-            Self::Minus { reverse, .. } => *reverse,
-            _ => false,
-        }
-    }
+
     fn lower_than_mul(&self) -> bool {
         match self {
             Self::Plus { .. } => true,

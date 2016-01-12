@@ -6,7 +6,9 @@ use std::rc::Rc;
 #[test]
 fn cache_json() {
     let pairs = read_values(&serde_json::from_str(include_str!("../cache.raw.json")).unwrap()).unwrap();
-    println!("{pairs:#?}")
+    for pair in pairs {
+        println!("{pair}")
+    }
 }
 
 fn read_values(v: &Value) -> Option<Vec<Record>> {
@@ -56,12 +58,7 @@ fn read_expression(pair: &Value) -> Option<Expression> {
                 "Subtract" => {
                     let lhs = read_expression(e.get(1)?)?;
                     let rhs = read_expression(e.get(2)?)?;
-                    Some(Expression::Minus { reverse: false, lhs: Rc::new(lhs), rhs: Rc::new(rhs) })
-                }
-                "RightTeeArrow" => {
-                    let lhs = read_expression(e.get(1)?)?;
-                    let rhs = read_expression(e.get(2)?)?;
-                    Some(Expression::Minus { reverse: true, lhs: Rc::new(lhs), rhs: Rc::new(rhs) })
+                    Some(Expression::Minus { lhs: Rc::new(lhs), rhs: Rc::new(rhs) })
                 }
                 _ => {
                     println!("O: {:?}", o);
