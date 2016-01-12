@@ -16,7 +16,7 @@ pub enum Expression {
     },
     /// 坏点, 中止计算
     Negative {
-        lhs: Rc<Expression>,
+        base: Rc<Expression>,
     },
     /// 连接两个数字, 等价于 $10x + y$
     Concat {

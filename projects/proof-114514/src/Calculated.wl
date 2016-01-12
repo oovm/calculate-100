@@ -3,9 +3,12 @@
 SetDirectory@NotebookDirectory[];
 
 
-LeftTeeArrow[x_,y_]:=x-y;
-RightTeeArrow[x_,y_]:=-x+y;
-AngleBracket[t_Integer,u_Integer]:=10 ^IntegerLength[u]t+u;
+LeftTeeArrow[x_,y_]:=Inactive[Plus][Inactive[Minus][x],y];
+AngleBracket[t_Integer,u_Integer]:=If[
+	u==0,
+	10t+u,
+	10^IntegerLength[u]t+u
+];
 enumerate[digits_]:=Module[
 	{n=Length[digits],u=2 Max[digits]+1,places,evaluate},
 	evaluate[n_List,m_Integer]:=Append[n,m];
@@ -40,10 +43,20 @@ findSimplest[list_List]:=Block[
 
 
 digits={1,1,4,5,1,4};
-ops=Flatten@{Inactive/@{Plus,LeftTeeArrow,RightTeeArrow,Times,Divide},AngleBracket};
+ops={Inactive@Plus,Inactive@Subtract,LeftTeeArrow,Inactive@Times,Inactive@Divide,AngleBracket};
 patterns =Evaluate[First[enumerate[digits]]]&@@@Tuples[ops,Length@digits-1];
 patterns =DeleteDuplicates[filterJoin/@patterns];
 answers = findSimplest/@SortBy[GroupBy[filterIntegers/@patterns,First],First]
 
 
 Export["cache.raw.json",answers,"ExpressionJSON"];
+
+
+-x+y//FullForm
+
+
+(* ::Input:: *)
+(**)
+
+
+Inactive[Plus][1,1]
