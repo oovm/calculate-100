@@ -1,23 +1,23 @@
 {
-    "name": "tsp-art",
-    "version": "1.0.0",
-    "description": "TSP Art Generator - Create artistic images using Traveling Salesman Problem algorithms",
+    "name": "sum100",
+    "version": "0.0.0",
+    "description": "Sum-100 solver - TypeScript implementation for solving number puzzle games",
     "keywords": [
-        "tsp",
-        "art",
-        "traveling-salesman",
-        "canvas",
-        "svg",
-        "generator",
-        "sampling",
-        "optimization"
+        "sum100",
+        "puzzle",
+        "solver",
+        "math",
+        "expression",
+        "ast",
+        "parser",
+        "calculator"
     ],
     "author": "Aster <galaster@foxmail.com>",
     "license": "MPL-2.0",
     "exports": {
         ".": {
             "types": "./src/index.ts",
-            "require": "./dist/tsp-art.umd.js",
+            "require": "./dist/sum100.umd.js",
             "import": "./src/index.ts"
         }
     },

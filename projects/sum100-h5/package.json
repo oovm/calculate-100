@@ -1,7 +1,7 @@
 {
-    "name": "tsp-art-h5",
+    "name": "sum100-h5",
     "version": "1.0.0",
-    "description": "TSP Art Generator playground with Vue 3",
+    "description": "Sum-100 solver playground with Vue 3",
     "type": "module",
     "scripts": {
         "dev": "vite",
@@ -11,14 +11,13 @@
     },
     "dependencies": {
         "@fluent/bundle": "^0.19.1",
-        "tsp-art": "workspace:*",
+        "sum100-ts": "workspace:*",
         "fluent-vue": "^3.7.1",
+        "katex": "^0.16.9",
         "vue": "^3.5.16",
         "vue-router": "^4.5.1"
     },
     "devDependencies": {
-        "@iconify-json/carbon": "^1.2.8",
-        "@iconify-json/mdi": "^1.2.3",
         "@types/node": "^20.17.57",
         "@unocss/preset-icons": "^0.58.9",
         "@unocss/preset-uno": "^0.58.9",
