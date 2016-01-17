@@ -34,14 +34,43 @@
       </div>
       
       <div class="options">
-        <label>
-          <input v-model="enableConcatenation" type="checkbox" :disabled="isRunning">
-          启用数字连接（如123）
-        </label>
-        <label>
-          <input v-model="showSteps" type="checkbox">
-          显示计算步骤
-        </label>
+        <div class="option-group">
+          <h3>基础设置</h3>
+          <label>
+            <input v-model="enableConcatenation" type="checkbox" :disabled="isRunning">
+            启用数字连接（如123）
+          </label>
+        </div>
+        
+        <div class="option-group">
+          <h3>运算设置</h3>
+          <div class="operation-options">
+            <label>
+              <input v-model="enableAddition" type="checkbox" :disabled="isRunning">
+              加法 (+)
+            </label>
+            <label>
+              <input v-model="enableSubtraction" type="checkbox" :disabled="isRunning">
+              减法 (-)
+            </label>
+            <label>
+              <input v-model="enableMultiplication" type="checkbox" :disabled="isRunning">
+              乘法 (×)
+            </label>
+            <label>
+              <input v-model="enableDivision" type="checkbox" :disabled="isRunning">
+              除法 (÷)
+            </label>
+            <label>
+              <input v-model="enablePower" type="checkbox" :disabled="isRunning">
+              幂运算 (^)
+            </label>
+            <label>
+              <input v-model="enableFactorial" type="checkbox" :disabled="isRunning">
+              阶乘 (!)
+            </label>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -130,6 +159,14 @@ const solutions = ref<SolutionResult[]>([]);
 const error = ref('');
 const inputRef = ref<HTMLInputElement>();
 const solutionRefs = ref<HTMLElement[]>([]);
+
+// 运算设置
+const enableAddition = ref(true);
+const enableSubtraction = ref(true);
+const enableMultiplication = ref(true);
+const enableDivision = ref(true);
+const enablePower = ref(false);  // 默认关闭
+const enableFactorial = ref(false);  // 默认关闭
 
 // Worker相关
 let worker: Worker | null = null;
@@ -250,7 +287,14 @@ function handleSolve() {
       payload: {
         input: inputValue.value,
         maxAttempts: 100000,
-        timeout: 30000
+        timeout: 30000,
+        enableConcatenation: enableConcatenation.value,
+        enableAddition: enableAddition.value,
+        enableSubtraction: enableSubtraction.value,
+        enableMultiplication: enableMultiplication.value,
+        enableDivision: enableDivision.value,
+        enablePower: enablePower.value,
+        enableFactorial: enableFactorial.value
       }
     };
     worker.postMessage(message);
@@ -403,7 +447,30 @@ function renderSolutions() {
 
 .options {
   display: flex;
-  gap: 2rem;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.option-group {
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.option-group h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #495057;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.operation-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
 }
 
 .options label {
@@ -412,10 +479,21 @@ function renderSolutions() {
   gap: 0.5rem;
   color: #5a6c7d;
   cursor: pointer;
+  font-size: 0.9rem;
 }
 
 .options input[type="checkbox"] {
-  transform: scale(1.2);
+  transform: scale(1.1);
+}
+
+.options input[type="checkbox"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.options label:has(input:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .progress-section {

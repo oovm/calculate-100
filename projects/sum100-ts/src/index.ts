@@ -7,7 +7,6 @@ export {
     BinaryOpNode,
     UnaryOpNode,
     ConcatNode,
-    ParenNode,
     ExpressionNode
 } from './ast/index.js';
 
@@ -36,8 +35,10 @@ export {
     type RenderResult,
     renderToText,
     renderToLatex,
+    renderToMathematica,
     renderMultipleToText,
     renderMultipleToLatex,
+    renderMultipleToMathematica,
     defaultRenderer,
     htmlRenderer
 } from './render/index.js';

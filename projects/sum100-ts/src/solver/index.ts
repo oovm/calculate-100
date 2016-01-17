@@ -36,10 +36,11 @@ interface GeneratorState {
     target: number;
     usedIndices: Set<number>;
     currentExpr?: ASTNode;
+    depth?: number;
 }
 
 // 记忆化缓存
-class MemoCache {
+class AttemptionCache {
     private cache = new Map<string, number>();
 
     get(key: string): number | undefined {
@@ -59,7 +60,7 @@ class MemoCache {
 }
 
 export class Solver {
-    private memo = new MemoCache();
+    private cache = new AttemptionCache();
     private startTime = 0;
     private attempts = 0;
     private solutions: ExpressionNode[] = [];
@@ -108,7 +109,7 @@ export class Solver {
     }
 
     private reset(): void {
-        this.memo.clear();
+        this.cache.clear();
         this.attempts = 0;
         this.solutions = [];
         this.cancelled = false;
@@ -161,7 +162,8 @@ export class Solver {
             await this.buildComplexExpressions({
                 ...state,
                 usedIndices: new Set([...state.usedIndices, i]),
-                currentExpr: node
+                currentExpr: node,
+                depth: (state.depth || 0) + 1
             });
         }
 
@@ -173,6 +175,10 @@ export class Solver {
 
     private async buildComplexExpressions(state: GeneratorState): Promise<void> {
         if (!state.currentExpr) return;
+
+        // 限制递归深度防止栈溢出
+        const maxDepth = 6;
+        if ((state.depth || 0) >= maxDepth) return;
 
         // 尝试一元运算
         await this.tryUnaryOperations(state);
@@ -204,7 +210,8 @@ export class Solver {
                 // 继续递归
                 await this.buildComplexExpressions({
                     ...state,
-                    currentExpr: node
+                    currentExpr: node,
+                    depth: (state.depth || 0) + 1
                 });
 
             } catch (error) {
@@ -240,7 +247,8 @@ export class Solver {
                     await this.buildComplexExpressions({
                         ...state,
                         usedIndices: new Set([...state.usedIndices, i]),
-                        currentExpr: node
+                        currentExpr: node,
+                        depth: (state.depth || 0) + 1
                     });
 
                 } catch (error) {
@@ -275,7 +283,8 @@ export class Solver {
                     await this.buildComplexExpressions({
                         ...state,
                         usedIndices: new Set([...state.usedIndices, ...indices]),
-                        currentExpr: node
+                        currentExpr: node,
+                        depth: (state.depth || 0) + 1
                     });
 
                 } catch (error) {
@@ -296,7 +305,7 @@ export class Solver {
 
     private evaluateWithMemo(node: ASTNode): number {
         const key = node.toString();
-        const cached = this.memo.get(key);
+        const cached = this.cache.get(key);
 
         if (cached !== undefined) {
             return cached;
@@ -309,7 +318,7 @@ export class Solver {
             throw new Error('Invalid result');
         }
 
-        this.memo.set(key, result);
+        this.cache.set(key, result);
         return result;
     }
 

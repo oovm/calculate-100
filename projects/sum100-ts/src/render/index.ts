@@ -1,12 +1,11 @@
 // 渲染器实现
 
-import {ExpressionNode} from '../ast/index.js';
+import {ASTNode, ExpressionNode, NumberNode, BinaryOpNode, UnaryOpNode, ConcatNode} from '../ast/index.js';
 import {SolutionResult} from '../solver/index.js';
 
 // 渲染选项
 export interface RenderOptions {
-    format: 'text' | 'latex';
-    showSteps?: boolean;
+    format: 'text' | 'latex' | 'mathematica';
     includeMetadata?: boolean;
 }
 
@@ -27,10 +26,15 @@ export class Renderer {
 
         let content: string;
 
-        if (options.format === 'latex') {
-            content = this.renderLatex(expression, options);
-        } else {
-            content = this.renderText(expression, options);
+        switch (options.format) {
+            case 'latex':
+                content = this.renderNodeLatex(expression);
+                break;
+            case 'mathematica':
+                content = this.renderNodeMathematica(expression);
+                break;
+            default:
+                content = this.renderNodeText(expression);
         }
 
         const renderResult: RenderResult = {content};
@@ -51,20 +55,33 @@ export class Renderer {
         options: RenderOptions = {format: 'text'}
     ): RenderResult {
         if (results.length === 0) {
+            const noSolutionText = {
+                'latex': '\\text{No solutions found}',
+                'mathematica': '"No solutions found"',
+                'text': 'No solutions found'
+            };
             return {
-                content: options.format === 'latex' ? '\\text{No solutions found}' : 'No solutions found'
+                content: noSolutionText[options.format] || noSolutionText.text
             };
         }
 
         const contents = results.map((result, index) => {
             const rendered = this.render(result, {...options, includeMetadata: false});
-            const prefix = options.format === 'latex'
-                ? `\\text{Solution ${index + 1}: }`
-                : `Solution ${index + 1}: `;
+            const prefixes = {
+                'latex': `\\text{Solution ${index + 1}: }`,
+                'mathematica': `(* Solution ${index + 1} *) `,
+                'text': `Solution ${index + 1}: `
+            };
+            const prefix = prefixes[options.format] || prefixes.text;
             return prefix + rendered.content;
         });
 
-        const separator = options.format === 'latex' ? '\\\\' : '\n';
+        const separators = {
+            'latex': '\\\\',
+            'mathematica': '\n',
+            'text': '\n'
+        };
+        const separator = separators[options.format] || separators.text;
         const content = contents.join(separator);
 
         const renderResult: RenderResult = {content};
@@ -84,42 +101,141 @@ export class Renderer {
         return renderResult;
     }
 
-    private renderText(expression: ExpressionNode, options: RenderOptions): string {
-        let result = expression.toString();
-
-        if (options.showSteps) {
-            result += this.generateSteps(expression, 'text');
+    // 渲染AST节点为文本格式
+    private renderNodeText(node: ASTNode): string {
+        switch (node.type) {
+            case 'number':
+                return (node as NumberNode).value.toString();
+            case 'binary_op': {
+                const binNode = node as BinaryOpNode;
+                const left = this.renderNodeText(binNode.left);
+                const right = this.renderNodeText(binNode.right);
+                return `(${left} ${binNode.operator} ${right})`;
+            }
+            case 'unary_op': {
+                const unaryNode = node as UnaryOpNode;
+                const operand = this.renderNodeText(unaryNode.operand);
+                if (unaryNode.operator === '!') {
+                    return `${operand}!`;
+                }
+                return `${unaryNode.operator}${operand}`;
+            }
+            case 'concat': {
+                const concatNode = node as ConcatNode;
+                return concatNode.numbers.join('');
+            }
+            case 'expression': {
+                const exprNode = node as ExpressionNode;
+                return `${this.renderNodeText(exprNode.left)} = ${exprNode.target}`;
+            }
+            default:
+                return 'Unknown';
         }
-
-        return result;
     }
 
-    private renderLatex(expression: ExpressionNode, options: RenderOptions): string {
-        let result = expression.toLatex();
-
-        if (options.showSteps) {
-            result += this.generateSteps(expression, 'latex');
+    // 渲染AST节点为LaTeX格式
+    private renderNodeLatex(node: ASTNode): string {
+        switch (node.type) {
+            case 'number':
+                return (node as NumberNode).value.toString();
+            case 'binary_op': {
+                const binNode = node as BinaryOpNode;
+                const left = this.renderNodeLatex(binNode.left);
+                const right = this.renderNodeLatex(binNode.right);
+                switch (binNode.operator) {
+                    case '+':
+                        return `${left} + ${right}`;
+                    case '-':
+                        return `${left} - ${right}`;
+                    case '*':
+                        return `${left} \\cdot ${right}`;
+                    case '/':
+                        return `\\frac{${left}}{${right}}`;
+                    case '%':
+                        return `${left} \\bmod ${right}`;
+                    case '^':
+                        return `${left}^{${right}}`;
+                    default:
+                        return `${left} ${binNode.operator} ${right}`;
+                }
+            }
+            case 'unary_op': {
+                const unaryNode = node as UnaryOpNode;
+                const operand = this.renderNodeLatex(unaryNode.operand);
+                switch (unaryNode.operator) {
+                    case '!':
+                        return `${operand}!`;
+                    case '√':
+                        return `\\sqrt{${operand}}`;
+                    case '-':
+                        return `-${operand}`;
+                    default:
+                        return `${unaryNode.operator}${operand}`;
+                }
+            }
+            case 'concat': {
+                const concatNode = node as ConcatNode;
+                return concatNode.numbers.join('');
+            }
+            case 'expression': {
+                const exprNode = node as ExpressionNode;
+                return `${this.renderNodeLatex(exprNode.left)} = ${exprNode.target}`;
+            }
+            default:
+                return 'Unknown';
         }
-
-        return result;
     }
 
-    private generateSteps(expression: ExpressionNode, format: 'text' | 'latex'): string {
-        try {
-            const value = expression.evaluate();
-            const target = expression.target;
-
-            if (format === 'latex') {
-                return `\\\\\\text{Evaluates to: } ${value} ${value === target ? '\\checkmark' : '\\times'}`;
-            } else {
-                return `\nEvaluates to: ${value} ${value === target ? '✓' : '✗'}`;
+    // 渲染AST节点为Mathematica格式
+    private renderNodeMathematica(node: ASTNode): string {
+        switch (node.type) {
+            case 'number':
+                return (node as NumberNode).value.toString();
+            case 'binary_op': {
+                const binNode = node as BinaryOpNode;
+                const left = this.renderNodeMathematica(binNode.left);
+                const right = this.renderNodeMathematica(binNode.right);
+                switch (binNode.operator) {
+                    case '+':
+                        return `(${left} + ${right})`;
+                    case '-':
+                        return `(${left} - ${right})`;
+                    case '*':
+                        return `(${left} * ${right})`;
+                    case '/':
+                        return `(${left} / ${right})`;
+                    case '%':
+                        return `Mod[${left}, ${right}]`;
+                    case '^':
+                        return `Power[${left}, ${right}]`;
+                    default:
+                        return `(${left} ${binNode.operator} ${right})`;
+                }
             }
-        } catch (error) {
-            if (format === 'latex') {
-                return `\\\\\\text{Error: } \\text{${error instanceof Error ? error.message : 'Unknown error'}}`;
-            } else {
-                return `\nError: ${error instanceof Error ? error.message : 'Unknown error'}`;
+            case 'unary_op': {
+                const unaryNode = node as UnaryOpNode;
+                const operand = this.renderNodeMathematica(unaryNode.operand);
+                switch (unaryNode.operator) {
+                    case '!':
+                        return `Factorial[${operand}]`;
+                    case '√':
+                        return `Sqrt[${operand}]`;
+                    case '-':
+                        return `-${operand}`;
+                    default:
+                        return `${unaryNode.operator}${operand}`;
+                }
             }
+            case 'concat': {
+                const concatNode = node as ConcatNode;
+                return concatNode.numbers.join('');
+            }
+            case 'expression': {
+                const exprNode = node as ExpressionNode;
+                return `${this.renderNodeMathematica(exprNode.left)} == ${exprNode.target}`;
+            }
+            default:
+                return 'Unknown';
         }
     }
 }
@@ -141,6 +257,14 @@ export function renderToLatex(
     return renderer.render(result, {...options, format: 'latex'}).content;
 }
 
+export function renderToMathematica(
+    result: SolutionResult,
+    options: Omit<RenderOptions, 'format'> = {}
+): string {
+    const renderer = new Renderer();
+    return renderer.render(result, {...options, format: 'mathematica'}).content;
+}
+
 export function renderMultipleToText(
     results: SolutionResult[],
     options: Omit<RenderOptions, 'format'> = {}
@@ -155,6 +279,14 @@ export function renderMultipleToLatex(
 ): string {
     const renderer = new Renderer();
     return renderer.renderMultiple(results, {...options, format: 'latex'}).content;
+}
+
+export function renderMultipleToMathematica(
+    results: SolutionResult[],
+    options: Omit<RenderOptions, 'format'> = {}
+): string {
+    const renderer = new Renderer();
+    return renderer.renderMultiple(results, {...options, format: 'mathematica'}).content;
 }
 
 // HTML渲染器（用于Web界面）

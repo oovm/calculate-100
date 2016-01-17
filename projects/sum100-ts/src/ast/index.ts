@@ -5,10 +5,6 @@ export interface ASTNode {
     type: string;
 
     evaluate(): number;
-
-    toString(): string;
-
-    toLatex(): string;
 }
 
 // 数字节点
@@ -22,13 +18,7 @@ export class NumberNode implements ASTNode {
         return this.value;
     }
 
-    toString(): string {
-        return this.value.toString();
-    }
 
-    toLatex(): string {
-        return this.value.toString();
-    }
 }
 
 // 二元运算节点
@@ -66,31 +56,7 @@ export class BinaryOpNode implements ASTNode {
         }
     }
 
-    toString(): string {
-        return `(${this.left.toString()} ${this.operator} ${this.right.toString()})`;
-    }
 
-    toLatex(): string {
-        const leftLatex = this.left.toLatex();
-        const rightLatex = this.right.toLatex();
-
-        switch (this.operator) {
-            case '+':
-                return `${leftLatex} + ${rightLatex}`;
-            case '-':
-                return `${leftLatex} - ${rightLatex}`;
-            case '*':
-                return `${leftLatex} \\cdot ${rightLatex}`;
-            case '/':
-                return `\\frac{${leftLatex}}{${rightLatex}}`;
-            case '%':
-                return `${leftLatex} \\bmod ${rightLatex}`;
-            case '^':
-                return `${leftLatex}^{${rightLatex}}`;
-            default:
-                return `${leftLatex} ${this.operator} ${rightLatex}`;
-        }
-    }
 }
 
 // 一元运算节点
@@ -128,27 +94,7 @@ export class UnaryOpNode implements ASTNode {
         return n * this.factorial(n - 1);
     }
 
-    toString(): string {
-        if (this.operator === '!') {
-            return `${this.operand.toString()}!`;
-        }
-        return `${this.operator}${this.operand.toString()}`;
-    }
 
-    toLatex(): string {
-        const operandLatex = this.operand.toLatex();
-
-        switch (this.operator) {
-            case '!':
-                return `${operandLatex}!`;
-            case '√':
-                return `\\sqrt{${operandLatex}}`;
-            case '-':
-                return `-${operandLatex}`;
-            default:
-                return `${this.operator}${operandLatex}`;
-        }
-    }
 }
 
 // 数字连接节点（如123表示1,2,3连接）
@@ -162,34 +108,10 @@ export class ConcatNode implements ASTNode {
         return parseInt(this.numbers.join(''));
     }
 
-    toString(): string {
-        return this.numbers.join('');
-    }
 
-    toLatex(): string {
-        return this.numbers.join('');
-    }
 }
 
-// 括号节点
-export class ParenNode implements ASTNode {
-    type = 'paren';
 
-    constructor(public expression: ASTNode) {
-    }
-
-    evaluate(): number {
-        return this.expression.evaluate();
-    }
-
-    toString(): string {
-        return `(${this.expression.toString()})`;
-    }
-
-    toLatex(): string {
-        return `\\left(${this.expression.toLatex()}\\right)`;
-    }
-}
 
 // 表达式节点（整个等式）
 export class ExpressionNode implements ASTNode {
@@ -213,11 +135,5 @@ export class ExpressionNode implements ASTNode {
         }
     }
 
-    toString(): string {
-        return `${this.left.toString()} = ${this.target}`;
-    }
 
-    toLatex(): string {
-        return `${this.left.toLatex()} = ${this.target}`;
-    }
 }

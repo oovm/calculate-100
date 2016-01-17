@@ -1,7 +1,7 @@
 {
     "name": "sum100",
     "version": "0.0.0",
-    "description": "Sum-100 solver - TypeScript implementation for solving number puzzle games",
+    "description": "Solving sum-100 number puzzle games",
     "keywords": [
         "sum100",
         "puzzle",
