@@ -17,14 +17,14 @@ export {
     parseInput
 } from './parser/index.js';
 
-// 导出求解器相关
+// Solver
 export {
     Solver,
+    solving,
     solve,
     type SolutionResult,
-    type SolverProgress,
     type SolverConfig,
-    type ProgressCallback
+    type SolverReport
 } from './solver/index.js';
 
 // 导出渲染器相关
@@ -49,10 +49,10 @@ export async function solveExpression(
     config?: import('./solver/index.js').SolverConfig
 ): Promise<import('./solver/index.js').SolutionResult> {
     const {parseInput} = await import('./parser/index.js');
-    const {solve} = await import('./solver/index.js');
+    const {solving} = await import('./solver/index.js');
 
     const {numbers, target} = parseInput(input);
-    return solve(numbers, target, config);
+    return solving(numbers, target, config);
 }
 
 // 版本信息

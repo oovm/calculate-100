@@ -12,6 +12,8 @@ import {
     renderToMathematica,
     renderToText,
     solve,
+    SolverReport,
+    solving,
     UnaryOpNode
 } from '../src/index.js';
 
@@ -102,10 +104,24 @@ describe('求解器测试', () => {
 
     it('应该处理数字连接', async () => {
         const result = await solve([1, 2, 3], 123, {
-            maxAttempts: 100,
-            timeout: 2000,
-            enableConcatenation: true
+            maxAttempts: 10000,
+            timeout: 5000,
+            enableConcatenation: true,
+            enableAddition: false,
+            enableSubtraction: false,
+            enableMultiplication: false,
+            enableDivision: false,
+            enablePower: false,
+            enableFactorial: false,
+            enableSquareRoot: false,
+            enableNegation: false,
+            enableModulo: false
         });
+
+        console.log('数字连接测试结果:', result.found, result.attempts);
+        if (result.found) {
+            console.log('找到的表达式:', result.expression.toString());
+        }
 
         expect(result.found).toBe(true);
         expect(result.expression.isValid()).toBe(true);
@@ -118,6 +134,56 @@ describe('求解器测试', () => {
         });
 
         expect(result.found).toBe(false);
+    });
+
+    it('应该使用generator模式报告进度', () => {
+        const reports: SolverReport[] = [];
+        const generator = solving([1, 2, 3], 6, {
+            maxAttempts: 100,
+            timeout: 2000,
+            reportInterval: 50
+        });
+
+        let result = generator.next();
+        while (!result.done) {
+            reports.push(result.value);
+            result = generator.next();
+            // 限制测试时间
+            if (reports.length > 10) break;
+        }
+
+        expect(reports.length).toBeGreaterThan(0);
+        expect(reports.some(r => r.type === 'progress')).toBe(true);
+    });
+
+    it('应该支持运算开关', async () => {
+        // 测试禁用加法
+        const result1 = await solve([1, 2], 3, {
+            maxAttempts: 100,
+            timeout: 1000,
+            enableAddition: false,
+            enableSubtraction: true,
+            enableMultiplication: true
+        });
+
+        // 测试禁用所有运算
+        const result2 = await solve([1, 2], 3, {
+            maxAttempts: 100,
+            timeout: 1000,
+            enableAddition: false,
+            enableSubtraction: false,
+            enableMultiplication: false,
+            enableDivision: false,
+            enablePower: false,
+            enableFactorial: false,
+            enableSquareRoot: false,
+            enableNegation: false,
+            enableModulo: false
+        });
+
+        // 第一个测试可能找到解（使用减法或乘法）
+        // 第二个测试应该找不到解（所有运算都被禁用）
+        expect(result2.found).toBe(false);
     });
 });
 

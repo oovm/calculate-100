@@ -112,7 +112,6 @@ export class ConcatNode implements ASTNode {
 }
 
 
-
 // 表达式节点（整个等式）
 export class ExpressionNode implements ASTNode {
     type = 'expression';

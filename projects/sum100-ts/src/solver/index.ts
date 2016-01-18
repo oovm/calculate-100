@@ -10,15 +10,16 @@ export interface SolutionResult {
     found: boolean;
 }
 
-// 求解进度回调
-export interface SolverProgress {
+// 求解进度报告
+export interface SolverReport {
+    type: 'progress' | 'solution' | 'complete';
     attempts: number;
     solutions: ExpressionNode[];
+    currentExpression?: ExpressionNode;
     eta: number; // 预计剩余时间（毫秒）
     progress: number; // 0-1之间的进度
+    duration: number; // 已用时间（毫秒）
 }
-
-export type ProgressCallback = (progress: SolverProgress) => void;
 
 // 求解器配置
 export interface SolverConfig {
@@ -26,8 +27,16 @@ export interface SolverConfig {
     timeout?: number; // 毫秒
     maxFactorialDepth?: number;
     enableConcatenation?: boolean;
-    progressCallback?: ProgressCallback;
-    progressInterval?: number; // 进度回调间隔（毫秒）
+    enableAddition?: boolean;
+    enableSubtraction?: boolean;
+    enableMultiplication?: boolean;
+    enableDivision?: boolean;
+    enablePower?: boolean;
+    enableFactorial?: boolean;
+    enableSquareRoot?: boolean;
+    enableNegation?: boolean;
+    enableModulo?: boolean;
+    reportInterval?: number; // 报告间隔（毫秒）
 }
 
 // 表达式生成器状态
@@ -66,7 +75,7 @@ export class Solver {
     private solutions: ExpressionNode[] = [];
     private config: Required<SolverConfig>;
     private cancelled = false;
-    private lastProgressTime = 0;
+    private lastReportTime = 0;
 
     constructor(config: SolverConfig = {}) {
         this.config = {
@@ -74,9 +83,16 @@ export class Solver {
             timeout: config.timeout ?? 30000,
             maxFactorialDepth: config.maxFactorialDepth ?? 3,
             enableConcatenation: config.enableConcatenation ?? true,
-            progressCallback: config.progressCallback ?? (() => {
-            }),
-            progressInterval: config.progressInterval ?? 100
+            enableAddition: config.enableAddition ?? true,
+            enableSubtraction: config.enableSubtraction ?? true,
+            enableMultiplication: config.enableMultiplication ?? true,
+            enableDivision: config.enableDivision ?? true,
+            enablePower: config.enablePower ?? true,
+            enableFactorial: config.enableFactorial ?? true,
+            enableSquareRoot: config.enableSquareRoot ?? true,
+            enableNegation: config.enableNegation ?? true,
+            enableModulo: config.enableModulo ?? true,
+            reportInterval: config.reportInterval ?? 100
         };
     }
 
@@ -84,12 +100,12 @@ export class Solver {
         this.cancelled = true;
     }
 
-    async solve(numbers: number[], target: number): Promise<SolutionResult> {
+    * solve(numbers: number[], target: number): Generator<SolverReport, SolutionResult, unknown> {
         this.reset();
         this.startTime = Date.now();
 
         try {
-            await this.generateExpressions(numbers, target);
+            yield* this.generateExpressions(numbers, target);
         } catch (error) {
             if (error instanceof Error && error.message === 'CANCELLED') {
                 // 被取消
@@ -99,6 +115,16 @@ export class Solver {
         }
 
         const duration = Date.now() - this.startTime;
+
+        // 发送完成报告
+        yield {
+            type: 'complete',
+            attempts: this.attempts,
+            solutions: [...this.solutions],
+            eta: 0,
+            progress: 1,
+            duration
+        };
 
         return {
             expression: this.solutions[0] || new ExpressionNode(new NumberNode(0), target),
@@ -113,19 +139,19 @@ export class Solver {
         this.attempts = 0;
         this.solutions = [];
         this.cancelled = false;
-        this.lastProgressTime = 0;
+        this.lastReportTime = 0;
     }
 
-    private async generateExpressions(numbers: number[], target: number): Promise<void> {
-        // 生成所有可能的表达式
-        await this.generateRecursive({
+    private* generateExpressions(numbers: number[], target: number): Generator<SolverReport, void, unknown> {
+        // 生成表达式并逐步报告进度
+        yield* this.generateRecursive({
             numbers,
             target,
             usedIndices: new Set()
         });
     }
 
-    private async generateRecursive(state: GeneratorState): Promise<void> {
+    private* generateRecursive(state: GeneratorState): Generator<SolverReport, void, unknown> {
         if (this.cancelled) {
             throw new Error('CANCELLED');
         }
@@ -138,12 +164,10 @@ export class Solver {
             return;
         }
 
-        // 更新进度
-        if (Date.now() - this.lastProgressTime >= this.config.progressInterval) {
-            this.updateProgress(state);
-            this.lastProgressTime = Date.now();
-            // 让出控制权给事件循环
-            await new Promise(resolve => setTimeout(resolve, 0));
+        // 发送进度报告
+        if (Date.now() - this.lastReportTime >= this.config.reportInterval) {
+            yield this.createProgressReport();
+            this.lastReportTime = Date.now();
         }
 
         // 尝试单个数字
@@ -154,12 +178,25 @@ export class Solver {
             const node = new NumberNode(num);
 
             if (this.checkSolution(node, state.target)) {
-                this.solutions.push(new ExpressionNode(node, state.target));
+                const solution = new ExpressionNode(node, state.target);
+                this.solutions.push(solution);
+
+                // 发送解决方案报告
+                yield {
+                    type: 'solution',
+                    attempts: this.attempts,
+                    solutions: [...this.solutions],
+                    currentExpression: solution,
+                    eta: this.calculateETA(),
+                    progress: this.calculateProgress(),
+                    duration: Date.now() - this.startTime
+                };
+
                 if (this.solutions.length >= 10) return; // 限制解的数量
             }
 
             // 递归构建更复杂的表达式
-            await this.buildComplexExpressions({
+            yield* this.buildComplexExpressions({
                 ...state,
                 usedIndices: new Set([...state.usedIndices, i]),
                 currentExpr: node,
@@ -169,11 +206,11 @@ export class Solver {
 
         // 尝试数字连接
         if (this.config.enableConcatenation) {
-            await this.tryNumberConcatenation(state);
+            yield* this.tryNumberConcatenation(state);
         }
     }
 
-    private async buildComplexExpressions(state: GeneratorState): Promise<void> {
+    private* buildComplexExpressions(state: GeneratorState): Generator<SolverReport, void, unknown> {
         if (!state.currentExpr) return;
 
         // 限制递归深度防止栈溢出
@@ -181,18 +218,24 @@ export class Solver {
         if ((state.depth || 0) >= maxDepth) return;
 
         // 尝试一元运算
-        await this.tryUnaryOperations(state);
+        yield* this.tryUnaryOperations(state);
 
         // 尝试二元运算
-        await this.tryBinaryOperations(state);
+        yield* this.tryBinaryOperations(state);
     }
 
-    private async tryUnaryOperations(state: GeneratorState): Promise<void> {
+    private* tryUnaryOperations(state: GeneratorState): Generator<SolverReport, void, unknown> {
         if (!state.currentExpr) return;
 
-        const operators: Array<'!' | '√' | '-'> = ['!', '√', '-'];
+        const operators: Array<{ op: '!' | '√' | '-', enabled: boolean }> = [
+            {op: '!', enabled: this.config.enableFactorial},
+            {op: '√', enabled: this.config.enableSquareRoot},
+            {op: '-', enabled: this.config.enableNegation}
+        ];
 
-        for (const op of operators) {
+        for (const {op, enabled} of operators) {
+            if (!enabled) continue;
+
             try {
                 // 检查阶乘深度限制
                 if (op === '!' && this.getFactorialDepth(state.currentExpr) >= this.config.maxFactorialDepth) {
@@ -203,12 +246,25 @@ export class Solver {
                 this.attempts++;
 
                 if (this.checkSolution(node, state.target)) {
-                    this.solutions.push(new ExpressionNode(node, state.target));
+                    const solution = new ExpressionNode(node, state.target);
+                    this.solutions.push(solution);
+
+                    // 发送解决方案报告
+                    yield {
+                        type: 'solution',
+                        attempts: this.attempts,
+                        solutions: [...this.solutions],
+                        currentExpression: solution,
+                        eta: this.calculateETA(),
+                        progress: this.calculateProgress(),
+                        duration: Date.now() - this.startTime
+                    };
+
                     if (this.solutions.length >= 10) return;
                 }
 
                 // 继续递归
-                await this.buildComplexExpressions({
+                yield* this.buildComplexExpressions({
                     ...state,
                     currentExpr: node,
                     depth: (state.depth || 0) + 1
@@ -221,12 +277,21 @@ export class Solver {
         }
     }
 
-    private async tryBinaryOperations(state: GeneratorState): Promise<void> {
+    private* tryBinaryOperations(state: GeneratorState): Generator<SolverReport, void, unknown> {
         if (!state.currentExpr) return;
 
-        const operators: Array<'+' | '-' | '*' | '/' | '%' | '^'> = ['+', '-', '*', '/', '%', '^'];
+        const operators: Array<{ op: '+' | '-' | '*' | '/' | '%' | '^', enabled: boolean }> = [
+            {op: '+', enabled: this.config.enableAddition},
+            {op: '-', enabled: this.config.enableSubtraction},
+            {op: '*', enabled: this.config.enableMultiplication},
+            {op: '/', enabled: this.config.enableDivision},
+            {op: '%', enabled: this.config.enableModulo},
+            {op: '^', enabled: this.config.enablePower}
+        ];
 
-        for (const op of operators) {
+        for (const {op, enabled} of operators) {
+            if (!enabled) continue;
+
             // 为右操作数尝试所有未使用的数字
             for (let i = 0; i < state.numbers.length; i++) {
                 if (state.usedIndices.has(i)) continue;
@@ -239,12 +304,25 @@ export class Solver {
                     this.attempts++;
 
                     if (this.checkSolution(node, state.target)) {
-                        this.solutions.push(new ExpressionNode(node, state.target));
+                        const solution = new ExpressionNode(node, state.target);
+                        this.solutions.push(solution);
+
+                        // 发送解决方案报告
+                        yield {
+                            type: 'solution',
+                            attempts: this.attempts,
+                            solutions: [...this.solutions],
+                            currentExpression: solution,
+                            eta: this.calculateETA(),
+                            progress: this.calculateProgress(),
+                            duration: Date.now() - this.startTime
+                        };
+
                         if (this.solutions.length >= 10) return;
                     }
 
                     // 继续递归
-                    await this.buildComplexExpressions({
+                    yield* this.buildComplexExpressions({
                         ...state,
                         usedIndices: new Set([...state.usedIndices, i]),
                         currentExpr: node,
@@ -259,7 +337,7 @@ export class Solver {
         }
     }
 
-    private async tryNumberConcatenation(state: GeneratorState): Promise<void> {
+    private* tryNumberConcatenation(state: GeneratorState): Generator<SolverReport, void, unknown> {
         // 尝试连接2-4个连续数字
         for (let len = 2; len <= Math.min(4, state.numbers.length); len++) {
             for (let start = 0; start <= state.numbers.length - len; start++) {
@@ -275,12 +353,25 @@ export class Solver {
                     this.attempts++;
 
                     if (this.checkSolution(node, state.target)) {
-                        this.solutions.push(new ExpressionNode(node, state.target));
+                        const solution = new ExpressionNode(node, state.target);
+                        this.solutions.push(solution);
+
+                        // 发送解决方案报告
+                        yield {
+                            type: 'solution',
+                            attempts: this.attempts,
+                            solutions: [...this.solutions],
+                            currentExpression: solution,
+                            eta: this.calculateETA(),
+                            progress: this.calculateProgress(),
+                            duration: Date.now() - this.startTime
+                        };
+
                         if (this.solutions.length >= 10) return;
                     }
 
                     // 继续递归
-                    await this.buildComplexExpressions({
+                    yield* this.buildComplexExpressions({
                         ...state,
                         usedIndices: new Set([...state.usedIndices, ...indices]),
                         currentExpr: node,
@@ -329,26 +420,57 @@ export class Solver {
         return 0;
     }
 
-    private updateProgress(state: GeneratorState): void {
-        const elapsed = Date.now() - this.startTime;
-        const progress = Math.min(this.attempts / this.config.maxAttempts, elapsed / this.config.timeout);
-        const eta = progress > 0 ? (elapsed / progress) - elapsed : this.config.timeout;
-
-        this.config.progressCallback({
+    private createProgressReport(): SolverReport {
+        return {
+            type: 'progress',
             attempts: this.attempts,
             solutions: [...this.solutions],
-            eta: Math.max(0, eta),
-            progress
-        });
+            eta: this.calculateETA(),
+            progress: this.calculateProgress(),
+            duration: Date.now() - this.startTime
+        };
+    }
+
+    private calculateProgress(): number {
+        const elapsed = Date.now() - this.startTime;
+        return Math.min(this.attempts / this.config.maxAttempts, elapsed / this.config.timeout);
+    }
+
+    private calculateETA(): number {
+        const elapsed = Date.now() - this.startTime;
+        const progress = this.calculateProgress();
+        const eta = progress > 0 ? (elapsed / progress) - elapsed : this.config.timeout;
+        return Math.max(0, eta);
     }
 }
 
 // 便捷函数
-export async function solve(
+export function* solving(
     numbers: number[],
     target: number,
     config?: SolverConfig
+): Generator<SolverReport, SolutionResult, unknown> {
+    const solver = new Solver(config);
+    return yield* solver.solve(numbers, target);
+}
+
+// 只需要一个解时的便捷函数
+export async function solve(
+    numbers: number[],
+    target: number,
+    config?: SolverConfig,
+    onReport?: (report: SolverReport) => void
 ): Promise<SolutionResult> {
     const solver = new Solver(config);
-    return solver.solve(numbers, target);
+    const generator = solver.solve(numbers, target);
+
+    let result = generator.next();
+    while (!result.done) {
+        if (onReport) {
+            onReport(result.value);
+        }
+        result = generator.next();
+    }
+
+    return result.value;
 }

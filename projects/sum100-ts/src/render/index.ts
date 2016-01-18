@@ -1,6 +1,6 @@
 // 渲染器实现
 
-import {ASTNode, ExpressionNode, NumberNode, BinaryOpNode, UnaryOpNode, ConcatNode} from '../ast/index.js';
+import {ASTNode, BinaryOpNode, ConcatNode, ExpressionNode, NumberNode, UnaryOpNode} from '../ast/index.js';
 import {SolutionResult} from '../solver/index.js';
 
 // 渲染选项
