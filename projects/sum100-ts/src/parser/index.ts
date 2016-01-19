@@ -1,6 +1,6 @@
 // 解析器实现
 
-import {ASTNode, BinaryOpNode, ExpressionNode, NumberNode, ParenNode, UnaryOpNode} from '../ast/index.js';
+import {ASTNode, BinaryOpNode, ExpressionNode, NumberNode, UnaryOpNode} from '../ast';
 
 // 词法分析器
 class Lexer {

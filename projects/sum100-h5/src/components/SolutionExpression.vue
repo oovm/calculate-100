@@ -15,14 +15,13 @@ const expressionRef = ref<HTMLElement | null>(null);
 function renderKaTeX() {
   if (expressionRef.value && props.solution) {
     try {
-      const latex = renderToLatex(props.solution);
+      const latex = renderToLatex(props.solution.expression);
       katex.render(latex, expressionRef.value, {
         displayMode: true,
         throwOnError: false
       });
     } catch (err) {
       console.error('KaTeX rendering error:', err);
-      expressionRef.value.textContent = props.solution.expression.toString();
     }
   }
 }

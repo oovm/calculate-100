@@ -14,7 +14,6 @@ export interface SolutionResult {
 export interface SolverReport {
     type: 'progress' | 'solution' | 'complete';
     attempts: number;
-    solutions: ExpressionNode[];
     currentExpression?: ExpressionNode;
     eta: number; // 预计剩余时间（毫秒）
     progress: number; // 0-1之间的进度
@@ -120,7 +119,6 @@ export class Solver {
         yield {
             type: 'complete',
             attempts: this.attempts,
-            solutions: [...this.solutions],
             eta: 0,
             progress: 1,
             duration
@@ -185,7 +183,6 @@ export class Solver {
                 yield {
                     type: 'solution',
                     attempts: this.attempts,
-                    solutions: [...this.solutions],
                     currentExpression: solution,
                     eta: this.calculateETA(),
                     progress: this.calculateProgress(),
@@ -253,7 +250,6 @@ export class Solver {
                     yield {
                         type: 'solution',
                         attempts: this.attempts,
-                        solutions: [...this.solutions],
                         currentExpression: solution,
                         eta: this.calculateETA(),
                         progress: this.calculateProgress(),
@@ -311,7 +307,6 @@ export class Solver {
                         yield {
                             type: 'solution',
                             attempts: this.attempts,
-                            solutions: [...this.solutions],
                             currentExpression: solution,
                             eta: this.calculateETA(),
                             progress: this.calculateProgress(),
@@ -360,7 +355,6 @@ export class Solver {
                         yield {
                             type: 'solution',
                             attempts: this.attempts,
-                            solutions: [...this.solutions],
                             currentExpression: solution,
                             eta: this.calculateETA(),
                             progress: this.calculateProgress(),
@@ -424,7 +418,6 @@ export class Solver {
         return {
             type: 'progress',
             attempts: this.attempts,
-            solutions: [...this.solutions],
             eta: this.calculateETA(),
             progress: this.calculateProgress(),
             duration: Date.now() - this.startTime

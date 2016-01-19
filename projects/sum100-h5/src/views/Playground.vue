@@ -7,32 +7,32 @@
         例如：<code>1 2 3 4 5 6 7 8 9 = 100</code>
       </p>
     </div>
-    
+
     <div class="input-section">
       <div class="input-group">
         <input
-          ref="inputRef"
-          v-model="inputValue"
-          type="text"
-          placeholder="输入数字序列和目标值，如：1 2 3 4 5 6 7 8 9 = 100"
-          class="expression-input"
-          :disabled="isRunning"
-          @keyup.enter="handleSolve"
+            ref="inputRef"
+            v-model="inputValue"
+            type="text"
+            placeholder="输入数字序列和目标值，如：1 2 3 4 5 6 7 8 9 = 100"
+            class="expression-input"
+            :disabled="isRunning"
+            @keyup.enter="handleSolve"
         >
         <button
-          class="solve-button"
-          :class="{
+            class="solve-button"
+            :class="{
             'running': isRunning,
             'completed': isCompleted
           }"
-          @click="handleButtonClick"
+            @click="handleButtonClick"
         >
           <span v-if="!isRunning && !isCompleted">求解</span>
           <span v-else-if="isRunning">停止</span>
           <span v-else>完成</span>
         </button>
       </div>
-      
+
       <div class="options">
         <div class="option-group">
           <h3>基础设置</h3>
@@ -41,7 +41,7 @@
             启用数字连接（如123）
           </label>
         </div>
-        
+
         <div class="option-group">
           <h3>运算设置</h3>
           <div class="operation-options">
@@ -73,13 +73,13 @@
         </div>
       </div>
     </div>
-    
+
     <!-- 进度显示 -->
     <div v-if="isRunning || progress" class="progress-section">
       <div class="progress-bar">
-        <div 
-          class="progress-fill" 
-          :style="{ width: `${(progress?.progress || 0) * 100}%` }"
+        <div
+            class="progress-fill"
+            :style="{ width: `${(progress?.progress || 0) * 100}%` }"
         ></div>
       </div>
       <div class="progress-stats">
@@ -89,7 +89,7 @@
         <span>进度: {{ Math.round((progress?.progress || 0) * 100) }}%</span>
       </div>
     </div>
-    
+
     <!-- 错误显示 -->
     <div v-if="error" class="error-section">
       <div class="error-message">
@@ -97,15 +97,15 @@
         {{ error }}
       </div>
     </div>
-    
+
     <!-- 解决方案显示 -->
     <div v-if="solutions.length > 0" class="solutions-section">
       <h2>找到的解 ({{ solutions.length }})</h2>
       <div class="solutions-list">
-        <div 
-          v-for="(solution, index) in solutions" 
-          :key="index"
-          class="solution-item"
+        <div
+            v-for="(solution, index) in solutions"
+            :key="index"
+            class="solution-item"
         >
           <div class="solution-header">
             <span class="solution-number">解 {{ index + 1 }}</span>
@@ -114,24 +114,20 @@
               <span>耗时: {{ solution.duration }}ms</span>
             </div>
           </div>
-          <div 
-            ref="solutionRefs"
-            class="solution-expression"
-            :data-latex="getSolutionLatex(solution)"
-          ></div>
+          <solution-expression :solution="solution"/>
         </div>
       </div>
     </div>
-    
+
     <!-- 示例 -->
     <div v-if="!isRunning && solutions.length === 0" class="examples-section">
       <h2>示例</h2>
       <div class="examples-list">
-        <div 
-          v-for="example in examples" 
-          :key="example.input"
-          class="example-item"
-          @click="loadExample(example.input)"
+        <div
+            v-for="example in examples"
+            :key="example.input"
+            class="example-item"
+            @click="loadExample(example.input)"
         >
           <code>{{ example.input }}</code>
           <span class="example-description">{{ example.description }}</span>
@@ -142,23 +138,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
-import { renderToLatex, SolutionResult } from 'sum100-ts';
-import katex from 'katex';
+import {nextTick, onMounted, onUnmounted, ref, watch} from 'vue';
+import {SolutionResult} from 'sum100';
 import 'katex/dist/katex.min.css';
-import type { WorkerMessage, WorkerResponse } from '../sum100.worker';
+import type {WorkerMessage, WorkerResponse} from '../sum100.worker';
+import SolutionExpression from '../components/SolutionExpression.vue';
 
 // 响应式数据
 const inputValue = ref('1 2 3 4 5 6 7 8 9 = 100');
 const isRunning = ref(false);
 const isCompleted = ref(false);
 const enableConcatenation = ref(true);
-const showSteps = ref(false);
 const progress = ref<any>(null);
 const solutions = ref<SolutionResult[]>([]);
 const error = ref('');
 const inputRef = ref<HTMLInputElement>();
-const solutionRefs = ref<HTMLElement[]>([]);
 
 // 运算设置
 const enableAddition = ref(true);
@@ -206,32 +200,31 @@ onUnmounted(() => {
 // 监听解决方案变化，渲染LaTeX
 watch(solutions, async () => {
   await nextTick();
-  renderSolutions();
-}, { deep: true });
+}, {deep: true});
 
 // 初始化Worker
 function initWorker() {
   worker = new Worker(
-    new URL('../sum100.worker.ts', import.meta.url),
-    { type: 'module' }
+      new URL('../sum100.worker.ts', import.meta.url),
+      {type: 'module'}
   );
-  
   worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-    const { type, payload } = event.data;
-    
+    const {type, payload} = event.data;
+
     switch (type) {
       case 'progress':
         if (payload?.progress) {
           progress.value = payload.progress;
         }
         break;
-        
+
       case 'solution':
         if (payload?.solution) {
+          console.log("解开", payload.solution)
           solutions.value.push(payload.solution);
         }
         break;
-        
+
       case 'complete':
         isRunning.value = false;
         isCompleted.value = true;
@@ -240,7 +233,7 @@ function initWorker() {
           isCompleted.value = false;
         }, 2000);
         break;
-        
+
       case 'error':
         isRunning.value = false;
         isCompleted.value = false;
@@ -249,7 +242,7 @@ function initWorker() {
         break;
     }
   };
-  
+
   worker.onerror = (err) => {
     console.error('Worker error:', err);
     error.value = 'Worker执行出错';
@@ -272,14 +265,14 @@ function handleSolve() {
     error.value = '请输入表达式';
     return;
   }
-  
+
   // 重置状态
   error.value = '';
   solutions.value = [];
   progress.value = null;
   isRunning.value = true;
   isCompleted.value = false;
-  
+
   // 发送求解消息给Worker
   if (worker) {
     const message: WorkerMessage = {
@@ -304,7 +297,7 @@ function handleSolve() {
 // 停止求解
 function handleStop() {
   if (worker) {
-    const message: WorkerMessage = { type: 'cancel' };
+    const message: WorkerMessage = {type: 'cancel'};
     worker.postMessage(message);
   }
   isRunning.value = false;
@@ -316,36 +309,6 @@ function loadExample(example: string) {
   error.value = '';
   solutions.value = [];
   inputRef.value?.focus();
-}
-
-// 获取解决方案的LaTeX
-function getSolutionLatex(solution: SolutionResult): string {
-  try {
-    return renderToLatex(solution, { showSteps: showSteps.value });
-  } catch (err) {
-    console.error('LaTeX rendering error:', err);
-    return solution.expression.toString();
-  }
-}
-
-// 渲染解决方案
-function renderSolutions() {
-  solutionRefs.value.forEach((el, index) => {
-    if (el && solutions.value[index]) {
-      const latex = el.dataset.latex;
-      if (latex) {
-        try {
-          katex.render(latex, el, {
-            displayMode: true,
-            throwOnError: false
-          });
-        } catch (err) {
-          console.error('KaTeX rendering error:', err);
-          el.textContent = solutions.value[index].expression.toString();
-        }
-      }
-    }
-  });
 }
 </script>
 
@@ -559,7 +522,7 @@ function renderSolutions() {
   background: white;
   border: 1px solid #e9ecef;
   border-radius: 0.5rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .solution-header {

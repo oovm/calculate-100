@@ -23,7 +23,7 @@ importers:
       katex:
         specifier: ^0.16.9
         version: 0.16.22
-      sum100-ts:
+      sum100:
         specifier: workspace:*
         version: link:../sum100-ts
       vue:
