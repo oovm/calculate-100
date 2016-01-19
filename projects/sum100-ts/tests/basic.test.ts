@@ -92,37 +92,37 @@ describe('解析器测试', () => {
 });
 
 describe('求解器测试', () => {
-    it('应该找到简单的解', async () => {
+    it('可处理加法', async () => {
         const result = await solve([1, 2, 3], 6, {
             maxAttempts: 100,
-            timeout: 2000
+            timeout: 1000,
+            enableAddition: true,
         });
 
         expect(result.found).toBe(true);
         expect(result.expression.isValid()).toBe(true);
     });
 
-    it('应该处理数字连接', async () => {
+    it('可处理乘法', async () => {
+        const result = await solve([1, 2, 3], 6, {
+            maxAttempts: 100,
+            timeout: 1000,
+            enableAddition: false,
+            enableMultiplication: true,
+        });
+
+        expect(result.found).toBe(true);
+        expect(result.expression.isValid()).toBe(true);
+    });
+
+
+
+    it('可处理处理数字连接', async () => {
         const result = await solve([1, 2, 3], 123, {
             maxAttempts: 10000,
             timeout: 5000,
             enableConcatenation: true,
-            enableAddition: false,
-            enableSubtraction: false,
-            enableMultiplication: false,
-            enableDivision: false,
-            enablePower: false,
-            enableFactorial: false,
-            enableSquareRoot: false,
-            enableNegation: false,
-            enableModulo: false
         });
-
-        console.log('数字连接测试结果:', result.found, result.attempts);
-        if (result.found) {
-            console.log('找到的表达式:', result.expression.toString());
-        }
-
         expect(result.found).toBe(true);
         expect(result.expression.isValid()).toBe(true);
     });

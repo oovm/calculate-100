@@ -3,8 +3,9 @@
 // 基础AST节点接口
 export interface ASTNode {
     type: string;
-
     evaluate(): number;
+    /// hash 必须, 并非格式化输出
+    toString(): string;
 }
 
 // 数字节点
@@ -17,8 +18,7 @@ export class NumberNode implements ASTNode {
     evaluate(): number {
         return this.value;
     }
-
-
+    toString(): string { return `Number(${this.value})`; }
 }
 
 // 二元运算节点
@@ -55,8 +55,9 @@ export class BinaryOpNode implements ASTNode {
                 throw new Error(`Unknown operator: ${this.operator}`);
         }
     }
-
-
+    toString(): string {
+        return `(${this.left.toString()} ${this.operator} ${this.right.toString()})`;
+    }
 }
 
 // 一元运算节点
@@ -93,8 +94,9 @@ export class UnaryOpNode implements ASTNode {
         if (n <= 1) return 1;
         return n * this.factorial(n - 1);
     }
-
-
+    toString(): string {
+        return `${this.operator}(${this.operand.toString()})`;
+    }
 }
 
 // 数字连接节点（如123表示1,2,3连接）
@@ -107,8 +109,9 @@ export class ConcatNode implements ASTNode {
     evaluate(): number {
         return parseInt(this.numbers.join(''));
     }
-
-
+    toString(): string {
+        return `Concat(${this.numbers.join('')})`;
+    }
 }
 
 
@@ -133,6 +136,7 @@ export class ExpressionNode implements ASTNode {
             return false;
         }
     }
-
-
+    toString(): string {
+        return `${this.left.toString()} = ${this.target}`;
+    }
 }
