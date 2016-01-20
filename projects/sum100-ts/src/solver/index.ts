@@ -1,6 +1,4 @@
-// 求解器实现
-
-import {ASTNode, BinaryOpNode, ConcatNode, ExpressionNode, NumberNode, UnaryOpNode} from '../ast/index.js';
+import {ASTNode, BinaryOpNode, ConcatNode, ExpressionNode, NumberNode, UnaryOpNode} from "../ast";
 
 // 求解结果
 export interface SolutionResult {
@@ -23,7 +21,8 @@ export interface SolverReport {
 // 求解器配置
 export interface SolverConfig {
     maxAttempts?: number;
-    timeout?: number; // 毫秒
+    // 毫秒
+    timeout?: number;
     maxFactorialDepth?: number;
     enableConcatenation?: boolean;
     enableAddition?: boolean;
@@ -35,20 +34,14 @@ export interface SolverConfig {
     enableSquareRoot?: boolean;
     enableNegation?: boolean;
     enableModulo?: boolean;
-    reportInterval?: number; // 报告间隔（毫秒）
+    // 报告间隔（毫秒）
+    reportInterval?: number;
+    // Max expression depth
+    maxDepth?: number;
 }
 
-// 表达式生成器状态
-interface GeneratorState {
-    numbers: number[];
-    target: number;
-    usedIndices: Set<number>;
-    currentExpr?: ASTNode;
-    depth?: number;
-}
-
-// 记忆化缓存
-class AttemptionCache {
+// 记忆化缓存 (保持不变)
+class AttemptCache {
     private cache = new Map<string, number>();
 
     get(key: string): number | undefined {
@@ -56,9 +49,9 @@ class AttemptionCache {
     }
 
     set(key: string, value: number): void {
-        if (this.cache.size > 10000) { // 限制缓存大小
+        if (this.cache.size > 100000) {
             this.cache.clear();
-        }
+        } // Increased cache size
         this.cache.set(key, value);
     }
 
@@ -68,7 +61,7 @@ class AttemptionCache {
 }
 
 export class Solver {
-    private cache = new AttemptionCache();
+    private cache = new AttemptCache();
     private startTime = 0;
     private attempts = 0;
     private solutions: ExpressionNode[] = [];
@@ -80,7 +73,7 @@ export class Solver {
         this.config = {
             maxAttempts: config.maxAttempts ?? 1000000,
             timeout: config.timeout ?? 30000,
-            maxFactorialDepth: config.maxFactorialDepth ?? 3,
+            maxFactorialDepth: config.maxFactorialDepth ?? 2, // Reduced default, deep factorials are slow
             enableConcatenation: config.enableConcatenation ?? true,
             enableAddition: config.enableAddition ?? true,
             enableSubtraction: config.enableSubtraction ?? true,
@@ -91,7 +84,9 @@ export class Solver {
             enableSquareRoot: config.enableSquareRoot ?? true,
             enableNegation: config.enableNegation ?? true,
             enableModulo: config.enableModulo ?? true,
-            reportInterval: config.reportInterval ?? 100
+            reportInterval: config.reportInterval ?? 100,
+            // Default max expression depth
+            maxDepth: config.maxDepth ?? 8,
         };
     }
 
@@ -103,19 +98,50 @@ export class Solver {
         this.reset();
         this.startTime = Date.now();
 
+        if (numbers.length === 0) {
+            const duration = Date.now() - this.startTime;
+            yield {type: 'complete', attempts: 0, eta: 0, progress: 1, duration};
+            return {
+                expression: new ExpressionNode(new NumberNode(0), target),
+                attempts: 0, duration, found: false
+            };
+        }
+
         try {
-            yield* this.generateExpressions(numbers, target);
+            // Initial AST creation considering order and concatenation ---
+            const initialAstCreationPaths: Array<{ ast: ASTNode, numbersConsumed: number }> = [];
+
+            // Path 1: First number itself
+            initialAstCreationPaths.push({ast: new NumberNode(numbers[0]), numbersConsumed: 1});
+
+            // Path 2: Concatenation from the beginning (if enabled)
+            if (this.config.enableConcatenation) {
+                // Concatenate 2 to 4 numbers (or up to numbers.length)
+                for (let len = 2; len <= Math.min(4, numbers.length); len++) {
+                    const initialNumsToConcat = numbers.slice(0, len);
+                    initialAstCreationPaths.push({ast: new ConcatNode(initialNumsToConcat), numbersConsumed: len});
+                }
+            }
+
+            for (const path of initialAstCreationPaths) {
+                // Early exit if enough solutions are found or other limits reached
+                if (this.cancelled || (this.solutions.length >= 10 && this.config.maxAttempts > this.attempts) || (Date.now() - this.startTime >= this.config.timeout)) {
+                    break;
+                }
+                const {ast: initialAst, numbersConsumed} = path;
+                const remainingInitialNumbers = numbers.slice(numbersConsumed);
+                yield* this.findCombinationsRecursive(initialAst, remainingInitialNumbers, target, 0);
+            }
         } catch (error) {
             if (error instanceof Error && error.message === 'CANCELLED') {
-                // 被取消
+                // Operation was cancelled
             } else {
-                throw error;
+                console.error("Solver error:", error); // Log other errors
+                throw error; // Rethrow if not a cancellation
             }
         }
 
         const duration = Date.now() - this.startTime;
-
-        // 发送完成报告
         yield {
             type: 'complete',
             attempts: this.attempts,
@@ -125,7 +151,7 @@ export class Solver {
         };
 
         return {
-            expression: this.solutions[0] || new ExpressionNode(new NumberNode(0), target),
+            expression: this.solutions[0] || new ExpressionNode(new NumberNode(NaN), target), // Default if no solution
             attempts: this.attempts,
             duration,
             found: this.solutions.length > 0
@@ -140,240 +166,146 @@ export class Solver {
         this.lastReportTime = 0;
     }
 
-    private* generateExpressions(numbers: number[], target: number): Generator<SolverReport, void, unknown> {
-        // 生成表达式并逐步报告进度
-        yield* this.generateRecursive({
-            numbers,
-            target,
-            usedIndices: new Set()
-        });
-    }
+    // --- NEW RECURSIVE FUNCTION ---
+    private* findCombinationsRecursive(
+        currentAst: ASTNode,
+        remainingNumbers: number[],
+        target: number,
+        depth: number
+    ): Generator<SolverReport, void, unknown> {
+        if (this.cancelled) throw new Error('CANCELLED');
+        if (Date.now() - this.startTime >= this.config.timeout) return;
+        if (depth >= this.config.maxDepth) return;
 
-    private* generateRecursive(state: GeneratorState): Generator<SolverReport, void, unknown> {
-        if (this.cancelled) {
-            throw new Error('CANCELLED');
-        }
+        this.attempts++; // Count each state visited as an attempt
 
-        if (this.attempts >= this.config.maxAttempts) {
-            return;
-        }
+        if (this.attempts >= this.config.maxAttempts && this.config.maxAttempts > 0) return;
 
-        if (Date.now() - this.startTime >= this.config.timeout) {
-            return;
-        }
 
-        // 发送进度报告
         if (Date.now() - this.lastReportTime >= this.config.reportInterval) {
             yield this.createProgressReport();
             this.lastReportTime = Date.now();
         }
 
-        // 尝试单个数字
-        for (let i = 0; i < state.numbers.length; i++) {
-            if (state.usedIndices.has(i)) continue;
-
-            const num = state.numbers[i];
-            const node = new NumberNode(num);
-
-            if (this.checkSolution(node, state.target)) {
-                const solution = new ExpressionNode(node, state.target);
-                this.solutions.push(solution);
-
-                // 发送解决方案报告
-                yield {
-                    type: 'solution',
-                    attempts: this.attempts,
-                    currentExpression: solution,
-                    eta: this.calculateETA(),
-                    progress: this.calculateProgress(),
-                    duration: Date.now() - this.startTime
-                };
-
-                if (this.solutions.length >= 10) return; // 限制解的数量
+        // Base Case: All numbers have been used
+        if (remainingNumbers.length === 0) {
+            if (this.checkSolution(currentAst, target)) {
+                const solution = new ExpressionNode(currentAst, target);
+                // Avoid adding string-wise duplicate solutions
+                if (!this.solutions.some(s => s.toString() === solution.toString())) {
+                    this.solutions.push(solution);
+                    yield {
+                        type: 'solution',
+                        attempts: this.attempts,
+                        currentExpression: solution,
+                        eta: this.calculateETA(0),
+                        progress: this.calculateProgress(0),
+                        duration: Date.now() - this.startTime
+                    };
+                }
             }
-
-            // 递归构建更复杂的表达式
-            yield* this.buildComplexExpressions({
-                ...state,
-                usedIndices: new Set([...state.usedIndices, i]),
-                currentExpr: node,
-                depth: (state.depth || 0) + 1
-            });
+            return;
         }
 
-        // 尝试数字连接
-        if (this.config.enableConcatenation) {
-            yield* this.tryNumberConcatenation(state);
-        }
-    }
-
-    private* buildComplexExpressions(state: GeneratorState): Generator<SolverReport, void, unknown> {
-        if (!state.currentExpr) return;
-
-        // 限制递归深度防止栈溢出
-        const maxDepth = 6;
-        if ((state.depth || 0) >= maxDepth) return;
-
-        // 尝试一元运算
-        yield* this.tryUnaryOperations(state);
-
-        // 尝试二元运算
-        yield* this.tryBinaryOperations(state);
-    }
-
-    private* tryUnaryOperations(state: GeneratorState): Generator<SolverReport, void, unknown> {
-        if (!state.currentExpr) return;
-
-        const operators: Array<{ op: '!' | '√' | '-', enabled: boolean }> = [
+        // Option 1: Apply unary operator to currentAst, then continue with the SAME remainingNumbers
+        const unaryOperators: Array<{ op: '!' | '√' | '-', enabled: boolean }> = [
             {op: '!', enabled: this.config.enableFactorial},
             {op: '√', enabled: this.config.enableSquareRoot},
             {op: '-', enabled: this.config.enableNegation}
         ];
 
-        for (const {op, enabled} of operators) {
+        for (const {op: unaryOp, enabled} of unaryOperators) {
             if (!enabled) continue;
+            if (this.solutions.length >= 10 && this.config.maxAttempts > 0 && this.config.maxAttempts <= this.attempts) return;
 
             try {
-                // 检查阶乘深度限制
-                if (op === '!' && this.getFactorialDepth(state.currentExpr) >= this.config.maxFactorialDepth) {
-                    continue;
-                }
+                const currentValue = this.evaluateWithCache(currentAst);
+                if (unaryOp === '!' && (this.getFactorialDepth(currentAst) >= this.config.maxFactorialDepth || currentValue < 0 || !Number.isInteger(currentValue) || currentValue > 15)) continue;
+                if (unaryOp === '!' && (Math.abs(currentValue - 2) < 1e-10 || Math.abs(currentValue - 1) < 1e-10)) continue;
+                if (unaryOp === '√' && currentValue < 0) continue;
+                if (unaryOp === '√' && Math.abs(currentValue - 1) < 1e-10) continue;
+                if (unaryOp === '-' && currentAst instanceof UnaryOpNode && currentAst.operator === '-') continue;
 
-                const node = new UnaryOpNode(op, state.currentExpr);
-                this.attempts++;
-
-                if (this.checkSolution(node, state.target)) {
-                    const solution = new ExpressionNode(node, state.target);
-                    this.solutions.push(solution);
-
-                    // 发送解决方案报告
-                    yield {
-                        type: 'solution',
-                        attempts: this.attempts,
-                        currentExpression: solution,
-                        eta: this.calculateETA(),
-                        progress: this.calculateProgress(),
-                        duration: Date.now() - this.startTime
-                    };
-
-                    if (this.solutions.length >= 10) return;
-                }
-
-                // 继续递归
-                yield* this.buildComplexExpressions({
-                    ...state,
-                    currentExpr: node,
-                    depth: (state.depth || 0) + 1
-                });
-
-            } catch (error) {
-                // 忽略计算错误（如负数开方、除零等）
-                continue;
+                const astWithUnaryOp = new UnaryOpNode(unaryOp, currentAst);
+                yield* this.findCombinationsRecursive(astWithUnaryOp, remainingNumbers, target, depth + 1);
+            } catch (e) {
+                /* Evaluation error during applicability check, skip */
             }
         }
-    }
 
-    private* tryBinaryOperations(state: GeneratorState): Generator<SolverReport, void, unknown> {
-        if (!state.currentExpr) return;
+        // Option 2: Form a right-hand side (RHS) from remainingNumbers, combine with currentAst using a binary operator
+        if (remainingNumbers.length === 0) return; // Should be caught by base case, defensive
 
-        const operators: Array<{ op: '+' | '-' | '*' | '/' | '%' | '^', enabled: boolean }> = [
-            {op: '+', enabled: this.config.enableAddition},
-            {op: '-', enabled: this.config.enableSubtraction},
-            {op: '*', enabled: this.config.enableMultiplication},
-            {op: '/', enabled: this.config.enableDivision},
-            {op: '%', enabled: this.config.enableModulo},
-            {op: '^', enabled: this.config.enablePower}
-        ];
+        const possibleRhsInfos: Array<{ node: ASTNode, numbersConsumedCount: number }> = [];
 
-        for (const {op, enabled} of operators) {
-            if (!enabled) continue;
-
-            // 为右操作数尝试所有未使用的数字
-            for (let i = 0; i < state.numbers.length; i++) {
-                if (state.usedIndices.has(i)) continue;
-
-                const rightNum = state.numbers[i];
-                const rightNode = new NumberNode(rightNum);
-
-                try {
-                    const node = new BinaryOpNode(state.currentExpr, op, rightNode);
-                    this.attempts++;
-
-                    if (this.checkSolution(node, state.target)) {
-                        const solution = new ExpressionNode(node, state.target);
-                        this.solutions.push(solution);
-
-                        // 发送解决方案报告
-                        yield {
-                            type: 'solution',
-                            attempts: this.attempts,
-                            currentExpression: solution,
-                            eta: this.calculateETA(),
-                            progress: this.calculateProgress(),
-                            duration: Date.now() - this.startTime
-                        };
-
-                        if (this.solutions.length >= 10) return;
-                    }
-
-                    // 继续递归
-                    yield* this.buildComplexExpressions({
-                        ...state,
-                        usedIndices: new Set([...state.usedIndices, i]),
-                        currentExpr: node,
-                        depth: (state.depth || 0) + 1
-                    });
-
-                } catch (error) {
-                    // 忽略计算错误
-                    continue;
-                }
+        // B1: RHS is the next single number
+        possibleRhsInfos.push({node: new NumberNode(remainingNumbers[0]), numbersConsumedCount: 1});
+//
+        // B2: RHS is a concatenation of the next few numbers (if enabled and more than 1 number can be concatenated)
+        if (this.config.enableConcatenation && remainingNumbers.length >= 2) {
+            for (let len = 2; len <= Math.min(4, remainingNumbers.length); len++) { // Concatenate 2 to 4 numbers
+                const numsToConcat = remainingNumbers.slice(0, len);
+                possibleRhsInfos.push({node: new ConcatNode(numsToConcat), numbersConsumedCount: len});
             }
         }
-    }
 
-    private* tryNumberConcatenation(state: GeneratorState): Generator<SolverReport, void, unknown> {
-        // 尝试连接2-4个连续数字
-        for (let len = 2; len <= Math.min(4, state.numbers.length); len++) {
-            for (let start = 0; start <= state.numbers.length - len; start++) {
-                const indices = Array.from({length: len}, (_, i) => start + i);
+        for (const rhsInfo of possibleRhsInfos) {
+            if (this.solutions.length >= 10 && this.config.maxAttempts > 0 && this.config.maxAttempts <= this.attempts) return;
 
-                // 检查是否有重复使用的索引
-                if (indices.some(i => state.usedIndices.has(i))) continue;
+            const {node: baseRhsNode, numbersConsumedCount} = rhsInfo;
+            const nextRemainingNumbersAfterRhs = remainingNumbers.slice(numbersConsumedCount);
 
-                const numbers = indices.map(i => state.numbers[i]);
-                const node = new ConcatNode(numbers);
+            const finalRhsNodes: ASTNode[] = [baseRhsNode]; // Start with the base RHS node
 
+            // Try applying unary operators to the baseRhsNode
+            for (const {op: unaryOp, enabled} of unaryOperators) {
+                if (!enabled) continue;
                 try {
-                    this.attempts++;
+                    const rhsValue = this.evaluateWithCache(baseRhsNode);
+                    if (unaryOp === '!' && (this.getFactorialDepth(baseRhsNode) >= this.config.maxFactorialDepth || rhsValue < 0 || !Number.isInteger(rhsValue) || rhsValue > 15)) continue;
+                    if (unaryOp === '!' && (Math.abs(rhsValue - 2) < 1e-10 || Math.abs(rhsValue - 1) < 1e-10)) continue;
+                    if (unaryOp === '√' && rhsValue < 0) continue;
+                    if (unaryOp === '√' && Math.abs(rhsValue - 1) < 1e-10) continue;
+                    if (unaryOp === '-' && baseRhsNode instanceof UnaryOpNode && baseRhsNode.operator === '-') continue;
 
-                    if (this.checkSolution(node, state.target)) {
-                        const solution = new ExpressionNode(node, state.target);
-                        this.solutions.push(solution);
+                    finalRhsNodes.push(new UnaryOpNode(unaryOp, baseRhsNode));
+                } catch (e) { /* Evaluation error during applicability check, skip */
+                }
+            }
 
-                        // 发送解决方案报告
-                        yield {
-                            type: 'solution',
-                            attempts: this.attempts,
-                            currentExpression: solution,
-                            eta: this.calculateETA(),
-                            progress: this.calculateProgress(),
-                            duration: Date.now() - this.startTime
-                        };
+            for (const finalRhsNode of finalRhsNodes) {
+                if (this.solutions.length >= 10 && this.config.maxAttempts > 0 && this.config.maxAttempts <= this.attempts) return;
 
-                        if (this.solutions.length >= 10) return;
+                const binaryOperators: Array<{ op: '+' | '-' | '*' | '/' | '%' | '^', enabled: boolean }> = [
+                    {op: '+', enabled: this.config.enableAddition},
+                    {op: '-', enabled: this.config.enableSubtraction},
+                    {op: '*', enabled: this.config.enableMultiplication},
+                    {op: '/', enabled: this.config.enableDivision},
+                    {op: '%', enabled: this.config.enableModulo},
+                    {op: '^', enabled: this.config.enablePower}
+                ];
+
+                for (const {op: binaryOp, enabled: binOpEnabled} of binaryOperators) {
+                    if (!binOpEnabled) continue;
+                    if (this.solutions.length >= 10 && this.config.maxAttempts > 0 && this.config.maxAttempts <= this.attempts) return;
+
+                    try {
+                        if (binaryOp === '/' || binaryOp === '%') {
+                            const rhsVal = this.evaluateWithCache(finalRhsNode);
+                            if (Math.abs(rhsVal) < 1e-12) continue; // Division/Modulo by zero (use small epsilon)
+                        }
+                        if (binaryOp === '^') {
+                            const lhsVal = this.evaluateWithCache(currentAst);
+                            if (Math.abs(lhsVal - 1) < 1e-12) continue; // Avoid 1^x
+                            const rhsVal = this.evaluateWithCache(finalRhsNode);
+                            if (Math.abs(lhsVal) < 1e-12 && rhsVal < 0) continue; // Avoid 0 to a negative power
+                            if (lhsVal < 0 && Math.abs(rhsVal % 1) > 1e-12) continue; // Avoid negative base to fractional power
+                        }
+
+                        const combinedAst = new BinaryOpNode(currentAst, binaryOp, finalRhsNode);
+                        yield* this.findCombinationsRecursive(combinedAst, nextRemainingNumbersAfterRhs, target, depth + 1);
+                    } catch (e) { /* Evaluation error during applicability check, skip */
                     }
-
-                    // 继续递归
-                    yield* this.buildComplexExpressions({
-                        ...state,
-                        usedIndices: new Set([...state.usedIndices, ...indices]),
-                        currentExpr: node,
-                        depth: (state.depth || 0) + 1
-                    });
-
-                } catch (error) {
-                    continue;
                 }
             }
         }
@@ -381,63 +313,64 @@ export class Solver {
 
     private checkSolution(node: ASTNode, target: number): boolean {
         try {
-            const result = this.evaluateWithMemo(node);
-            return Math.abs(result - target) < 1e-10;
+            const result = this.evaluateWithCache(node);
+            return Math.abs(result - target) < 1e-9; // Tolerance for float comparison
         } catch {
             return false;
         }
     }
 
-    private evaluateWithMemo(node: ASTNode): number {
+    private evaluateWithCache(node: ASTNode): number {
+        // TODO: 这里实际上应该是 hash
         const key = node.toString();
         const cached = this.cache.get(key);
-
-        if (cached !== undefined) {
-            return cached;
-        }
+        if (cached !== undefined) return cached;
 
         const result = node.evaluate();
-
-        // 检查结果是否有效
         if (!isFinite(result) || isNaN(result)) {
-            throw new Error('Invalid result');
+            throw new Error('Invalid evaluation result');
         }
-
         this.cache.set(key, result);
         return result;
     }
 
     private getFactorialDepth(node: ASTNode): number {
-        if (node instanceof UnaryOpNode && node.operator === '!') {
-            return 1 + this.getFactorialDepth(node.operand);
+        let depth = 0;
+        let currentNode = node;
+        while (currentNode instanceof UnaryOpNode && currentNode.operator === '!') {
+            depth++;
+            currentNode = currentNode.operand;
         }
-        return 0;
+        return depth;
     }
 
     private createProgressReport(): SolverReport {
+        const duration = Date.now() - this.startTime;
         return {
             type: 'progress',
             attempts: this.attempts,
-            eta: this.calculateETA(),
-            progress: this.calculateProgress(),
-            duration: Date.now() - this.startTime
+            eta: this.calculateETA(duration),
+            progress: this.calculateProgress(duration),
+            duration
         };
     }
 
-    private calculateProgress(): number {
-        const elapsed = Date.now() - this.startTime;
-        return Math.min(this.attempts / this.config.maxAttempts, elapsed / this.config.timeout);
+    private calculateProgress(elapsed: number): number {
+        if (this.config.maxAttempts <= 0) return Math.min(elapsed / this.config.timeout, 1); // Time based if no max attempts
+        return Math.min(this.attempts / this.config.maxAttempts, elapsed / this.config.timeout, 1);
+
     }
 
-    private calculateETA(): number {
-        const elapsed = Date.now() - this.startTime;
-        const progress = this.calculateProgress();
-        const eta = progress > 0 ? (elapsed / progress) - elapsed : this.config.timeout;
+    private calculateETA(elapsed: number): number {
+        const progress = this.calculateProgress(elapsed);
+        if (progress < 1e-9) return this.config.timeout; // Avoid division by zero if progress is negligible
+        const estimatedTotalTime = elapsed / progress;
+        const eta = estimatedTotalTime - elapsed;
         return Math.max(0, eta);
     }
 }
 
-// 便捷函数
+// 函数求解形式
 export function* solving(
     numbers: number[],
     target: number,
@@ -447,7 +380,6 @@ export function* solving(
     return yield* solver.solve(numbers, target);
 }
 
-// 只需要一个解时的便捷函数
 export async function solve(
     numbers: number[],
     target: number,
@@ -456,14 +388,13 @@ export async function solve(
 ): Promise<SolutionResult> {
     const solver = new Solver(config);
     const generator = solver.solve(numbers, target);
-
     let result = generator.next();
     while (!result.done) {
-        if (onReport) {
-            onReport(result.value);
+        onReport?.(result.value)
+        if (result.value.type === 'solution' && config?.maxAttempts === 0) {
+            // Potentially break early if one solution is enough
         }
         result = generator.next();
     }
-
     return result.value;
 }

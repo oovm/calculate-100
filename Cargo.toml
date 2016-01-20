@@ -6,6 +6,8 @@ default-members = [
 ]
 exclude = [
     "projects/.DS_Store",
+    "projects/sum100-ts",
+    "projects/sum100-h5",
 ]
 
 [profile.release]

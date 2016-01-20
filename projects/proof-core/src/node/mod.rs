@@ -163,7 +163,7 @@ impl Calculate {
         stack
     }
     pub fn expressions_dfs<'i>(&'i self) -> impl Iterator<Item = Rc<TreeState>> + 'i {
-        from_coroutine(move || {
+        from_coroutine(#[coroutine] move || {
             for pattern in Operators::all().iter().copied().permutations(self.digits.len() - 1) {
                 for expression in self.apply(&pattern) {
                     if expression.almost_integer() {

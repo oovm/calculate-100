@@ -5,8 +5,8 @@ export default defineConfig({
         target: 'es2020',
         lib: {
             entry: 'src/index.ts',
-            name: 'Sum100TS',
-            fileName: (format) => `sum100-ts.${format}.js`,
+            name: 'Puzzle100',
+            fileName: (format) => `puzzle100.${format}.js`,
         },
         rollupOptions: {
             output: {
@@ -15,7 +15,4 @@ export default defineConfig({
         }
     },
     plugins: [],
-    test: {
-        environment: 'jsdom'
-    }
 });

@@ -139,7 +139,7 @@
 
 <script setup lang="ts">
 import {nextTick, onMounted, onUnmounted, ref, watch} from 'vue';
-import {SolutionResult} from 'sum100';
+import {SolutionResult} from 'calculate100';
 import 'katex/dist/katex.min.css';
 import type {WorkerMessage, WorkerResponse} from '../sum100.worker';
 import SolutionExpression from '../components/SolutionExpression.vue';

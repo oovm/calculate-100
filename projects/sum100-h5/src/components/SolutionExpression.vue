@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import {onMounted, ref, watch} from 'vue';
-import {renderToLatex, SolutionResult} from 'sum100';
+import {renderToLatex, SolutionResult} from 'calculate100';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
 

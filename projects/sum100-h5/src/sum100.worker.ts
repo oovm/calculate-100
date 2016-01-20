@@ -1,6 +1,6 @@
 // Sum-100 求解器 Worker
 
-import {parseInput, SolutionResult, solve, SolverConfig, SolverReport, solving} from 'sum100';
+import {parseInput, SolutionResult, solve, SolverConfig, SolverReport, solving} from 'calculate100';
 
 // Worker消息类型
 interface WorkerMessage {
